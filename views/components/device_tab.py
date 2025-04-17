@@ -1,4 +1,5 @@
 from PySide6 import QtWidgets, QtGui
+from models.enums import DeviceType
 
 
 class DeviceTab(QtWidgets.QWidget):
@@ -58,6 +59,32 @@ class DeviceTab(QtWidgets.QWidget):
         device_id_layout.addWidget(device_id_label)
         device_id_layout.addWidget(self.device_id)
         self.layout.addLayout(device_id_layout)
+        
+        # 设备类型
+        device_type_layout = QtWidgets.QHBoxLayout()
+        device_type_label = QtWidgets.QLabel('设备类型：')
+        device_type_layout.addWidget(device_type_label)
+        
+        # 创建单选按钮组
+        self.device_type_group = QtWidgets.QButtonGroup(self)
+        
+        # 阿里云设备选项
+        self.radio_aliyun = QtWidgets.QRadioButton('阿里云')
+        self.radio_aliyun.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt;')
+        self.device_type_group.addButton(self.radio_aliyun, 0)
+        device_type_layout.addWidget(self.radio_aliyun)
+        
+        # 华为云设备选项
+        self.radio_huawei = QtWidgets.QRadioButton('华为云')
+        self.radio_huawei.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt;')
+        self.device_type_group.addButton(self.radio_huawei, 1)
+        device_type_layout.addWidget(self.radio_huawei)
+        
+        # 默认选择阿里云
+        self.radio_aliyun.setChecked(True)
+        
+        # 添加到主布局
+        self.layout.addLayout(device_type_layout)
         
         # 设备URL
         device_url_layout = QtWidgets.QHBoxLayout()
@@ -124,6 +151,13 @@ class DeviceTab(QtWidgets.QWidget):
         self.alert_yellow.setText(str(device.get('alert_yellow', '')))
         self.alert_orange.setText(str(device.get('alert_orange', '')))
         self.alert_red.setText(str(device.get('alert_red', '')))
+        
+        # 设置设备类型
+        device_type = device.get('type', DeviceType.ALIYUN.value)
+        if device_type == DeviceType.HUAWEI.value:
+            self.radio_huawei.setChecked(True)
+        else:
+            self.radio_aliyun.setChecked(True)
     
     def add_device(self):
         """添加新设备"""
@@ -134,6 +168,7 @@ class DeviceTab(QtWidgets.QWidget):
         new_device = {
             'id': f'设备{len(self.devices) + 1}',
             'url': '',
+            'type': DeviceType.ALIYUN.value,  # 默认为阿里云设备
             'alert_yellow': '',
             'alert_orange': '',
             'alert_red': ''
@@ -165,6 +200,13 @@ class DeviceTab(QtWidgets.QWidget):
             device = self.devices[current_index]
             device['id'] = self.device_id.text()
             device['url'] = self.device_url.text()
+            
+            # 保存设备类型
+            if self.radio_huawei.isChecked():
+                device['type'] = DeviceType.HUAWEI.value
+            else:
+                device['type'] = DeviceType.ALIYUN.value
+                
             device['alert_yellow'] = self.alert_yellow.text()
             device['alert_orange'] = self.alert_orange.text()
             device['alert_red'] = self.alert_red.text()
@@ -176,6 +218,7 @@ class DeviceTab(QtWidgets.QWidget):
         """清空设备详情表单"""
         self.device_id.clear()
         self.device_url.clear()
+        self.radio_aliyun.setChecked(True)  # 重置为默认的阿里云设备类型
         self.alert_yellow.clear()
         self.alert_orange.clear()
         self.alert_red.clear()

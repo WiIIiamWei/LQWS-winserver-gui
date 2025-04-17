@@ -1,123 +1,6 @@
-from PySide6 import QtWidgets, QtGui, QtCore
-import json
+from PySide6 import QtWidgets, QtCore
 
-
-class CodeEditor(QtWidgets.QPlainTextEdit):
-    """扩展QPlainTextEdit，添加行号支持"""
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        
-        # 设置等宽字体
-        self.setFont(self._get_monospace_font())
-        self.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
-        
-        # 创建行号区域
-        self.line_number_area = LineNumberArea(self)
-        
-        # 连接信号
-        self.blockCountChanged.connect(self.update_line_number_area_width)
-        self.updateRequest.connect(self.update_line_number_area)
-        
-        # 初始化行号区域宽度
-        self.update_line_number_area_width(0)
-    
-    def _get_monospace_font(self):
-        """获取等宽字体"""
-        font = QtGui.QFont()
-        
-        # 尝试常见等宽字体，优先级从高到低
-        font_families = ["Consolas", "Courier New", "DejaVu Sans Mono", "Monospace", "Lucida Console"]
-        
-        for family in font_families:
-            font.setFamily(family)
-            if QtGui.QFontInfo(font).fixedPitch():
-                break
-        
-        # 确保使用等宽字体，即使上面的字体都不可用
-        font.setStyleHint(QtGui.QFont.Monospace)
-        font.setFixedPitch(True)
-        font.setPointSize(10)
-        
-        return font
-    
-    def line_number_area_width(self):
-        """计算行号区域宽度"""
-        digits = max(1, len(str(self.blockCount())))
-        space = 10 + self.fontMetrics().horizontalAdvance('9') * digits
-        return space
-    
-    def update_line_number_area_width(self, _):
-        """更新行号区域宽度"""
-        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
-    
-    def update_line_number_area(self, rect, dy):
-        """更新行号区域"""
-        if dy:
-            self.line_number_area.scroll(0, dy)
-        else:
-            self.line_number_area.update(0, rect.y(), self.line_number_area.width(), rect.height())
-        
-        if rect.contains(self.viewport().rect()):
-            self.update_line_number_area_width(0)
-    
-    def resizeEvent(self, event):
-        """处理窗口大小变化事件"""
-        super().resizeEvent(event)
-        
-        cr = self.contentsRect()
-        self.line_number_area.setGeometry(QtCore.QRect(cr.left(), cr.top(),
-                                         self.line_number_area_width(), cr.height()))
-    
-    def line_number_area_paint_event(self, event):
-        """绘制行号区域内容"""
-        painter = QtGui.QPainter(self.line_number_area)
-        
-        # 设置背景颜色
-        bg_color = QtGui.QColor(45, 45, 45)  # 深灰色背景
-        painter.fillRect(event.rect(), bg_color)
-        
-        # 获取可见的第一个块
-        block = self.firstVisibleBlock()
-        block_number = block.blockNumber()
-        
-        # 计算块的顶部坐标
-        top = round(self.blockBoundingGeometry(block).translated(
-                    self.contentOffset()).top())
-        bottom = top + round(self.blockBoundingRect(block).height())
-        
-        # 使用与编辑器相同的等宽字体
-        painter.setFont(self.font())
-        
-        # 绘制所有可见行号
-        while block.isValid() and top <= event.rect().bottom():
-            if block.isVisible() and bottom >= event.rect().top():
-                number = str(block_number + 1)
-                painter.setPen(QtGui.QColor(180, 180, 180))  # 浅灰色文本
-                painter.drawText(0, top, self.line_number_area.width()-5, 
-                                self.fontMetrics().height(),
-                                QtCore.Qt.AlignRight, number)
-            
-            block = block.next()
-            top = bottom
-            bottom = top + round(self.blockBoundingRect(block).height())
-            block_number += 1
-
-
-class LineNumberArea(QtWidgets.QWidget):
-    """行号区域小部件"""
-    
-    def __init__(self, editor):
-        super().__init__(editor)
-        self.editor = editor
-    
-    def sizeHint(self):
-        """提供尺寸建议"""
-        return QtCore.QSize(self.editor.line_number_area_width(), 0)
-    
-    def paintEvent(self, event):
-        """绘制行号"""
-        self.editor.line_number_area_paint_event(event)
+from views.dialogs.json_editor import JSONEditorDialog
 
 
 class AutoUpdateTab(QtWidgets.QWidget):
@@ -129,20 +12,34 @@ class AutoUpdateTab(QtWidgets.QWidget):
         # 创建布局
         self.layout = QtWidgets.QVBoxLayout(self)
         
-        # AccessKeySecret输入框
-        self._create_secret_input()
+        # 阿里云AccessKeySecret输入框
+        self._create_aliyun_secret_input()
         
-        # JSON编辑区
-        self._create_json_editor()
+        # 华为云IAM相关输入框
+        self._create_huawei_iam_inputs()
         
-        # 操作按钮
-        self._create_action_buttons()
+        # 添加弹性空间
+        self.layout.addItem(QtWidgets.QSpacerItem(
+            20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
+        ))
+        
+        # JSON编辑按钮
+        self._create_json_edit_button()
+        
+        # 存储JSON数据
+        self.json_data = []
         
         # 连接信号槽
         self._connect_signals()
     
-    def _create_secret_input(self):
-        """创建AccessKeySecret输入框"""
+    def _create_aliyun_secret_input(self):
+        """创建阿里云AccessKeySecret输入框"""
+        # 创建标签
+        aliyun_label = QtWidgets.QLabel("阿里云设置")
+        aliyun_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt; font-weight: bold')
+        self.layout.addWidget(aliyun_label)
+        
+        # AccessKeySecret输入框
         secret_layout = QtWidgets.QHBoxLayout()
         secret_label = QtWidgets.QLabel('AccessKeySecret：')
         self.secret_input = QtWidgets.QLineEdit()
@@ -150,44 +47,103 @@ class AutoUpdateTab(QtWidgets.QWidget):
         self.secret_input.setPlaceholderText('输入阿里云提供的AccessKeySecret')
         self.secret_input.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt; font-weight: bold')
         self.secret_input.setObjectName('auto_update_secret')
+        
+        # 设置尺寸策略，允许水平拉伸
+        size_policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.secret_input.setSizePolicy(size_policy)
+        
         secret_layout.addWidget(secret_label)
         secret_layout.addWidget(self.secret_input)
         self.layout.addLayout(secret_layout)
     
-    def _create_json_editor(self):
-        """创建JSON编辑区"""
-        # 添加标签
-        json_label = QtWidgets.QLabel('请在下方编辑自动更新数据字段配置：')
-        json_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt; font-weight: bold')
-        self.layout.addWidget(json_label)
+    def _create_huawei_iam_inputs(self):
+        """创建华为云IAM相关输入框"""
+        # 创建标签
+        huawei_label = QtWidgets.QLabel("华为云IAM设置")
+        huawei_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt; font-weight: bold')
+        self.layout.addWidget(huawei_label)
         
-        # 使用改进的CodeEditor替代QPlainTextEdit
-        self.json_editor = CodeEditor()
-        self.json_editor.setPlaceholderText('请输入JSON格式的配置数据...')
-        self.json_editor.setObjectName('json_editor')
+        # 华为云IAM用户名
+        username_layout = QtWidgets.QHBoxLayout()
+        username_label = QtWidgets.QLabel('用户名：')
+        self.huawei_username = QtWidgets.QLineEdit()
+        self.huawei_username.setPlaceholderText('输入华为云IAM用户名')
+        self.huawei_username.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt; font-weight: bold')
+        self.huawei_username.setObjectName('huawei_iam_username')
+        username_layout.addWidget(username_label)
+        username_layout.addWidget(self.huawei_username)
+        self.layout.addLayout(username_layout)
         
-        # 添加到布局
-        self.layout.addWidget(self.json_editor)
+        # 华为云IAM密码
+        password_layout = QtWidgets.QHBoxLayout()
+        password_label = QtWidgets.QLabel('密码：')
+        self.huawei_password = QtWidgets.QLineEdit()
+        self.huawei_password.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.huawei_password.setPlaceholderText('输入华为云IAM密码')
+        self.huawei_password.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt; font-weight: bold')
+        self.huawei_password.setObjectName('huawei_iam_password')
+        password_layout.addWidget(password_label)
+        password_layout.addWidget(self.huawei_password)
+        self.layout.addLayout(password_layout)
+        
+        # 华为云IAM域名
+        domain_layout = QtWidgets.QHBoxLayout()
+        domain_label = QtWidgets.QLabel('域名：')
+        self.huawei_domain = QtWidgets.QLineEdit()
+        self.huawei_domain.setPlaceholderText('输入华为云IAM域名')
+        self.huawei_domain.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt; font-weight: bold')
+        self.huawei_domain.setObjectName('huawei_iam_domain')
+        domain_layout.addWidget(domain_label)
+        domain_layout.addWidget(self.huawei_domain)
+        self.layout.addLayout(domain_layout)
+        
+        # 华为云IAM区域
+        area_layout = QtWidgets.QHBoxLayout()
+        area_label = QtWidgets.QLabel('区域：')
+        self.huawei_area = QtWidgets.QLineEdit()
+        self.huawei_area.setPlaceholderText('输入华为云IAM区域')
+        self.huawei_area.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt; font-weight: bold')
+        self.huawei_area.setObjectName('huawei_iam_area')
+        area_layout.addWidget(area_label)
+        area_layout.addWidget(self.huawei_area)
+        self.layout.addLayout(area_layout)
+        
+        # 设置所有输入框的尺寸策略
+        for widget in [self.huawei_username, self.huawei_password, self.huawei_domain, self.huawei_area]:
+            size_policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+            widget.setSizePolicy(size_policy)
     
-    def _create_action_buttons(self):
-        """创建操作按钮"""
+    def _create_json_edit_button(self):
+        """创建JSON编辑按钮"""
+        # 创建标签
+        json_header = QtWidgets.QLabel("自动更新数据配置")
+        json_header.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt; font-weight: bold')
+        self.layout.addWidget(json_header)
+        
+        # 创建按钮和信息布局
         button_layout = QtWidgets.QHBoxLayout()
         
-        # 格式化按钮
-        self.format_button = QtWidgets.QPushButton('格式化JSON')
-        self.format_button.setStyleSheet("QPushButton:hover{background:#366ecc;}")
-        button_layout.addWidget(self.format_button)
+        # 说明标签
+        json_label = QtWidgets.QLabel('点击右侧按钮编辑自动更新的数据字段:')
+        json_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 10pt;')
         
-        # 验证按钮
-        self.validate_button = QtWidgets.QPushButton('验证JSON')
-        self.validate_button.setStyleSheet("QPushButton:hover{background:#366ecc;}")
-        button_layout.addWidget(self.validate_button)
+        # 编辑按钮
+        self.edit_json_button = QtWidgets.QPushButton('编辑JSON配置')
+        self.edit_json_button.setStyleSheet("""
+            QPushButton {
+                font-family: Microsoft Yahei;
+                font-size: 10pt;
+                font-weight: bold;
+                padding: 5px 10px;
+            }
+            QPushButton:hover {
+                background:#366ecc;
+            }
+        """)
         
-        # 重置按钮
-        self.reset_button = QtWidgets.QPushButton('重置')
-        self.reset_button.setStyleSheet("QPushButton:hover{background:#366ecc;}")
-        button_layout.addWidget(self.reset_button)
-        
+        button_layout.addWidget(json_label)
+        button_layout.addStretch(1)
+        button_layout.addWidget(self.edit_json_button)
         self.layout.addLayout(button_layout)
         
         # 添加状态标签
@@ -197,100 +153,40 @@ class AutoUpdateTab(QtWidgets.QWidget):
     
     def _connect_signals(self):
         """连接信号和槽"""
-        self.format_button.clicked.connect(self.format_json)
-        self.validate_button.clicked.connect(self.validate_json)
-        self.reset_button.clicked.connect(self.reset_json)
+        self.edit_json_button.clicked.connect(self.open_json_editor)
     
-    def format_json(self):
-        """格式化JSON"""
-        try:
-            # 获取当前文本
-            current_text = self.json_editor.toPlainText()
-            
-            # 如果文本为空，不执行任何操作
-            if not current_text.strip():
-                return
-            
-            # 解析JSON
-            json_data = json.loads(current_text)
-            
-            # 重新格式化并设置文本
-            formatted_text = json.dumps(json_data, indent=2, ensure_ascii=False)
-            self.json_editor.setPlainText(formatted_text)
-            
-            # 更新状态
-            self.status_label.setText('JSON已格式化')
-            self.status_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 9pt;')
-        except json.JSONDecodeError as e:
-            # 显示错误信息
-            self.status_label.setText(f'JSON格式错误: {str(e)}')
-            self.status_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 9pt;')
-    
-    def validate_json(self):
-        """验证JSON"""
-        try:
-            current_text = self.json_editor.toPlainText()
-            
-            # 如果文本为空，不执行任何操作
-            if not current_text.strip():
-                self.status_label.setText('请输入JSON数据')
-                self.status_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 9pt;')
-                return
-            
-            # 尝试解析JSON
-            json.loads(current_text)
-            
-            # 验证成功
-            self.status_label.setText('JSON格式有效')
-            self.status_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 9pt;')
-        except json.JSONDecodeError as e:
-            # 显示错误信息
-            self.status_label.setText(f'JSON格式错误: {str(e)}')
-            self.status_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 9pt;')
-    
-    def reset_json(self):
-        """重置JSON编辑器内容"""
-        # 确认对话框
-        reply = QtWidgets.QMessageBox.question(
-            self, '确认重置', '确定要清空当前编辑的内容吗？',
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-            QtWidgets.QMessageBox.No
-        )
+    def open_json_editor(self):
+        """打开JSON编辑器对话框"""
+        dialog = JSONEditorDialog(self, self.json_data)
+        result = dialog.exec()
         
-        if reply == QtWidgets.QMessageBox.Yes:
-            self.json_editor.clear()
-            self.status_label.setText('内容已重置')
-            self.status_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 9pt;')
+        if result == QtWidgets.QDialog.Accepted:
+            self.json_data = dialog.get_json()
+            self.status_label.setText('JSON配置已更新')
+            self.status_label.setStyleSheet('font-family: Microsoft Yahei; font-size: 9pt; color: green;')
     
     def update_from_config(self, config_item):
         """从配置更新UI"""
-        # 更新AccessKeySecret
+        # 更新阿里云AccessKeySecret
         self.secret_input.setText(config_item.get('access-key-secret', ''))
         
-        # 更新JSON编辑器
-        fields = config_item.get('value', [])
-        formatted_json = json.dumps(fields, indent=2, ensure_ascii=False)
-        self.json_editor.setPlainText(formatted_json)
+        # 更新华为云IAM相关设置
+        self.huawei_username.setText(config_item.get('huawei_iam_username', ''))
+        self.huawei_password.setText(config_item.get('huawei_iam_password', ''))
+        self.huawei_domain.setText(config_item.get('huawei_iam_domain', ''))
+        self.huawei_area.setText(config_item.get('huawei_iam_area', ''))
+        
+        # 更新JSON数据
+        self.json_data = config_item.get('value', [])
     
     def get_config(self):
         """获取当前配置"""
-        # 获取AccessKeySecret
-        secret = self.secret_input.text()
-        
-        # 获取JSON数据
-        try:
-            json_text = self.json_editor.toPlainText()
-            if json_text.strip():
-                fields = json.loads(json_text)
-            else:
-                fields = []
-        except json.JSONDecodeError:
-            # 如果JSON无效，返回空列表
-            fields = []
-            # 可以在这里添加错误处理，如显示错误消息
-        
         return {
             'setting': 'request_cycle',
-            'access-key-secret': secret,
-            'value': fields
+            'access-key-secret': self.secret_input.text(),
+            'huawei_iam_username': self.huawei_username.text(),
+            'huawei_iam_password': self.huawei_password.text(),
+            'huawei_iam_domain': self.huawei_domain.text(),
+            'huawei_iam_area': self.huawei_area.text(),
+            'value': self.json_data
         }
