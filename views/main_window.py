@@ -258,5 +258,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def open_start_dialog(self):
         """打开服务器启动对话框"""
-        self.dlg = StartDialog()
-        self.dlg.exec()
+        config_path = self.file_selector.get_file_path()
+        
+        if not config_path:
+            self.update_status('错误：未选择配置文件，无法启动服务器', is_error=True)
+            return
+        
+        try:
+            # 启动服务器对话框
+            self.dlg = StartDialog(config_path=config_path)
+            self.dlg.exec()
+        except Exception as e:
+            self.update_status(f'启动服务器失败：{str(e)}', is_error=True)
