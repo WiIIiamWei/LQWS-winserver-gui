@@ -17,3 +17,5 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+运行 `main.py` 即可。
