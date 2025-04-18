@@ -3,6 +3,8 @@ import json
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtGui import QPainter, QColor, QBrush, Qt
 
+from views.components.title_bar import CustomTitleBar
+
 
 class LineNumberArea(QtWidgets.QWidget):
     """行号区域小部件"""
@@ -128,10 +130,18 @@ class JSONEditorDialog(QtWidgets.QDialog):
     def __init__(self, parent=None, json_data=None):
         super().__init__(parent)
         self.setWindowTitle('JSON编辑器')
+        # 修改窗口标志，同时保持对话框特性
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        # 确保窗口保持在前面
+        self.setAttribute(Qt.WA_TranslucentBackground)
         self.resize(600, 500)
 
         # 主布局
         self.layout = QtWidgets.QVBoxLayout(self)
+
+        # 添加标题栏
+        title_bar = CustomTitleBar('JSON编辑器', self)  # 修正标题
+        self.layout.addWidget(title_bar)
 
         # 创建JSON编辑区
         self._create_json_editor()
